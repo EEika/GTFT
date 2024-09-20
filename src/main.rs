@@ -8,6 +8,7 @@ fn main() {
     let time_now = SystemTime::now();
     for i in args {
         println!("{i}");
+        println!("{i}");
     }
     println!("{:?}", time_now.elapsed().unwrap().as_nanos());
 }
