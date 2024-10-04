@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "pomodoro-cli"
+name = "gtft"
 version = "0.1.0"
