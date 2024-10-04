@@ -20,10 +20,15 @@ fn main() {
 
     let check_time = Duration::new(1, 0);
 
+    println!(
+        "Starting focus for: {}:{}",
+        focus_periode.interval.as_secs() / 60,
+        focus_periode.interval.as_secs() % 60
+    );
     while focus_periode.interval.as_secs() > time_now.elapsed().unwrap().as_secs() {
         std::thread::sleep(check_time);
     }
-    println!("Done!");
+    println!("Done! Well done!");
 }
 
 enum FocusPurpose {
