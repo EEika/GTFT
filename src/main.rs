@@ -30,26 +30,36 @@ impl FocusPeriode {
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
 
-    let mut terminal = ratatui::init();
-    terminal.clear()?;
+    let mut focus_time = 5;
+    let mut focus_purpose = FocusPurpose::Work;
+
+    if let Some(ft) = args.get(1) {
+        match ft.parse() {
+            Ok(x) => focus_time = x,
+            Err(e) => focus_time = 5,
+        }
+    }
+    if let Some(p) = args.get(2) {
+        match p.as_str() {
+            "Work" => focus_purpose = FocusPurpose::Work,
+            "Study" => focus_purpose = FocusPurpose::Study,
+            "Mindfullness" => focus_purpose = FocusPurpose::Mindfullness,
+            _ => focus_purpose = FocusPurpose::Work,
+        }
+    }
 
     let focus_periode = FocusPeriode {
-        interval: Duration::new(10 * 60, 0),
-        purpose: FocusPurpose::Work,
+        interval: Duration::new(focus_time, 0),
+        purpose: focus_purpose,
         start_time: Instant::now(),
     };
 
+    let mut terminal = ratatui::init();
+    terminal.clear()?;
+
     let app_result = run(terminal, &focus_periode);
-
-    //let time_now = Instant::now();
-    //
-    //let check_time = Duration::new(1, 0);
-
-    //while focus_periode.interval.as_secs() > time_now.elapsed().unwrap().as_secs() {
-    //    std::thread::sleep(check_time);
-    //}
     ratatui::restore();
-    //println!("Done! \x07");
+
     Notification::new()
         .summary("GTFT")
         .body(&format!(
