@@ -1,9 +1,11 @@
 #![allow(unused_imports, unused_variables)]
 use notify_rust::{Notification, Timeout};
 use ratatui::{
-    crossterm::event::{self, KeyCode, KeyEventKind},
+    crossterm::event::{self, KeyCode, KeyEventKind, KeyModifiers},
+    layout::Flex,
+    prelude::*,
     style::{Color, Style, Stylize},
-    widgets::LineGauge,
+    widgets::{block::Title, Block, Borders, Gauge, LineGauge, Paragraph},
     DefaultTerminal,
 };
 use std::env;
@@ -23,6 +25,7 @@ impl FocusPeriode {
     }
 
     fn ratio_remaining(&self) -> f64 {
+        println!(u64)
         self.start_time.elapsed().as_secs() as f64 / self.interval.as_secs() as f64
     }
 }
@@ -30,26 +33,36 @@ impl FocusPeriode {
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
 
-    let mut focus_time = 10 * 60;
+    let mut focus_time_min: u64 = 25;
+    let mut focus_time_sec: u64 = 0;
     let mut focus_purpose = FocusPurpose::Work;
 
     if let Some(ft) = args.get(1) {
         match ft.parse() {
-            Ok(x) => focus_time = x,
+            Ok(m) => focus_time_min = m,
             Err(e) => (),
         }
     }
-    if let Some(p) = args.get(2) {
+    if let Some(ft) = args.get(2) {
+        match ft.parse() {
+            Ok(s) => focus_time_sec = s,
+            Err(e) => (),
+        }
+    }
+    if let Some(p) = args.get(3) {
         match p.as_str() {
             "Work" => focus_purpose = FocusPurpose::Work,
+            "0" => focus_purpose = FocusPurpose::Work,
             "Study" => focus_purpose = FocusPurpose::Study,
+            "1" => focus_purpose = FocusPurpose::Study,
             "Mindfullness" => focus_purpose = FocusPurpose::Mindfullness,
+            "2" => focus_purpose = FocusPurpose::Mindfullness,
             _ => (),
         }
     }
 
     let focus_periode = FocusPeriode {
-        interval: Duration::new(focus_time, 0),
+        interval: Duration::new((focus_time_min * 60) + focus_time_sec, 0),
         purpose: focus_purpose,
         start_time: Instant::now(),
     };
@@ -76,26 +89,41 @@ fn main() -> io::Result<()> {
 fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<()> {
     loop {
         terminal.draw(|frame| {
-            let progress = LineGauge::default()
-                .filled_style(Style::default().fg(Color::Blue))
+            let area = center(
+                frame.area(),
+                Constraint::Percentage(80),
+                Constraint::Percentage(80),
+            );
+            let progress = Gauge::default()
+                .block(
+                    Block::new()
+                        .title(Title::from("Progress").alignment(Alignment::Center))
+                        .borders(Borders::ALL),
+                )
+                .gauge_style(Style::default().fg(Color::Blue))
                 .label(format!(
-                    "Time remaining: {}:{}",
+                    "Time remaining: {}:{:0>2}",
                     periode.time_remaining() / 60,
                     periode.time_remaining() % 60
                 ))
                 .ratio(periode.ratio_remaining());
             //.white()
             //.on_dark_gray();
-            frame.render_widget(progress, frame.area());
+            frame.render_widget(progress, area);
         })?;
         if periode.time_remaining() == 0 {
             return Ok(());
         }
-        //if let event::Event::Key(key) = event::read()? {
-        //    if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-        //        return Ok(());
-        //    }
-        //}
+        if event::poll(Duration::from_millis(250))? {
+            if let event::Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press
+                    && key.code == KeyCode::Char('c')
+                    && key.modifiers == KeyModifiers::CONTROL
+                {
+                    return Ok(());
+                }
+            }
+        }
     }
 }
 #[derive(Debug)]
@@ -113,4 +141,12 @@ impl FocusPurpose {
             FocusPurpose::Mindfullness => "Mindfullness",
         }
     }
+}
+
+fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
+    let [area] = Layout::horizontal([horizontal])
+        .flex(Flex::Center)
+        .areas(area);
+    let [area] = Layout::vertical([vertical]).flex(Flex::Center).areas(area);
+    area
 }
