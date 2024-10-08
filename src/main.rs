@@ -30,13 +30,13 @@ impl FocusPeriode {
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
 
-    let mut focus_time = 5;
+    let mut focus_time = 10 * 60;
     let mut focus_purpose = FocusPurpose::Work;
 
     if let Some(ft) = args.get(1) {
         match ft.parse() {
             Ok(x) => focus_time = x,
-            Err(e) => focus_time = 5,
+            Err(e) => (),
         }
     }
     if let Some(p) = args.get(2) {
@@ -44,7 +44,7 @@ fn main() -> io::Result<()> {
             "Work" => focus_purpose = FocusPurpose::Work,
             "Study" => focus_purpose = FocusPurpose::Study,
             "Mindfullness" => focus_purpose = FocusPurpose::Mindfullness,
-            _ => focus_purpose = FocusPurpose::Work,
+            _ => (),
         }
     }
 
