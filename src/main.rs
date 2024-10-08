@@ -25,7 +25,6 @@ impl FocusPeriode {
     }
 
     fn ratio_remaining(&self) -> f64 {
-        println!(u64)
         self.start_time.elapsed().as_secs() as f64 / self.interval.as_secs() as f64
     }
 }
@@ -73,20 +72,25 @@ fn main() -> io::Result<()> {
     let app_result = run(terminal, &focus_periode);
     ratatui::restore();
 
-    Notification::new()
-        .summary("GTFT")
-        .body(&format!(
-            "{} session finished. Well done!",
-            focus_periode.purpose.display()
-        ))
-        //.timeout(Timeout::Milliseconds(6000)) //milliseconds
-        .show()
-        .unwrap();
-    println!("Done!\x07");
-    app_result
+    match app_result? {
+        FocusStatus::Finished => {
+            Notification::new()
+                .summary("GTFT")
+                .body(&format!(
+                    "{} session finished. Well done!",
+                    focus_periode.purpose.display()
+                ))
+                //.timeout(Timeout::Milliseconds(6000)) //milliseconds
+                .show()
+                .unwrap();
+            println!("Done!\x07");
+        }
+        FocusStatus::Canceled => (),
+    };
+    Ok(())
 }
 
-fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<()> {
+fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<FocusStatus> {
     loop {
         terminal.draw(|frame| {
             let area = center(
@@ -112,7 +116,7 @@ fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<()> 
             frame.render_widget(progress, area);
         })?;
         if periode.time_remaining() == 0 {
-            return Ok(());
+            return Ok(FocusStatus::Finished);
         }
         if event::poll(Duration::from_millis(250))? {
             if let event::Event::Key(key) = event::read()? {
@@ -120,7 +124,7 @@ fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<()> 
                     && key.code == KeyCode::Char('c')
                     && key.modifiers == KeyModifiers::CONTROL
                 {
-                    return Ok(());
+                    return Ok(FocusStatus::Canceled);
                 }
             }
         }
@@ -131,6 +135,11 @@ enum FocusPurpose {
     Work,
     Study,
     Mindfullness,
+}
+
+enum FocusStatus {
+    Finished,
+    Canceled,
 }
 
 impl FocusPurpose {
