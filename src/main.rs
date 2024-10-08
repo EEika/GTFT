@@ -1,20 +1,30 @@
+#![allow(unused_imports, unused_variables)]
+use notify_rust::{Notification, Timeout};
 use ratatui::{
     crossterm::event::{self, KeyCode, KeyEventKind},
-    style::Stylize,
-    widgets::{self, Paragraph},
+    style::{Color, Style, Stylize},
+    widgets::LineGauge,
     DefaultTerminal,
 };
-use std::io;
-
-use std::alloc::System;
 use std::env;
-use std::os::unix::thread;
-use std::thread::sleep;
-use std::time::{Duration, SystemTime};
+use std::io;
+use std::time::{Duration, Instant};
 
-struct FocusPeriod {
+#[derive(Debug)]
+struct FocusPeriode {
     interval: Duration,
     purpose: FocusPurpose,
+    start_time: Instant,
+}
+
+impl FocusPeriode {
+    fn time_remaining(&self) -> u64 {
+        self.interval.as_secs() - self.start_time.elapsed().as_secs()
+    }
+
+    fn ratio_remaining(&self) -> f64 {
+        self.start_time.elapsed().as_secs() as f64 / self.interval.as_secs() as f64
+    }
 }
 
 fn main() -> io::Result<()> {
@@ -23,41 +33,74 @@ fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
     terminal.clear()?;
 
-    let app_result = run(terminal);
-
-    let focus_periode = FocusPeriod {
-        interval: Duration::new(10, 0),
+    let focus_periode = FocusPeriode {
+        interval: Duration::new(10 * 60, 0),
         purpose: FocusPurpose::Work,
+        start_time: Instant::now(),
     };
-    let time_now = SystemTime::now();
 
-    let check_time = Duration::new(1, 0);
+    let app_result = run(terminal, &focus_periode);
+
+    //let time_now = Instant::now();
+    //
+    //let check_time = Duration::new(1, 0);
 
     //while focus_periode.interval.as_secs() > time_now.elapsed().unwrap().as_secs() {
     //    std::thread::sleep(check_time);
     //}
-    println!("Done!");
     ratatui::restore();
+    //println!("Done! \x07");
+    Notification::new()
+        .summary("GTFT")
+        .body(&format!(
+            "{} session finished. Well done!",
+            focus_periode.purpose.display()
+        ))
+        //.timeout(Timeout::Milliseconds(6000)) //milliseconds
+        .show()
+        .unwrap();
+    println!("Done!\x07");
     app_result
 }
 
-fn run(mut terminal: DefaultTerminal) -> io::Result<()> {
+fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<()> {
     loop {
         terminal.draw(|frame| {
-            let greeting = Paragraph::new("Hello Ratatui! (press 'q' to quit)")
-                .white()
-                .on_dark_gray();
-            frame.render_widget(greeting, frame.area());
+            let progress = LineGauge::default()
+                .filled_style(Style::default().fg(Color::Blue))
+                .label(format!(
+                    "Time remaining: {}:{}",
+                    periode.time_remaining() / 60,
+                    periode.time_remaining() % 60
+                ))
+                .ratio(periode.ratio_remaining());
+            //.white()
+            //.on_dark_gray();
+            frame.render_widget(progress, frame.area());
         })?;
-        if let event::Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-                return Ok(());
-            }
+        if periode.time_remaining() == 0 {
+            return Ok(());
         }
+        //if let event::Event::Key(key) = event::read()? {
+        //    if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
+        //        return Ok(());
+        //    }
+        //}
     }
 }
+#[derive(Debug)]
 enum FocusPurpose {
     Work,
     Study,
     Mindfullness,
+}
+
+impl FocusPurpose {
+    fn display(&self) -> &str {
+        match self {
+            FocusPurpose::Work => "Work",
+            FocusPurpose::Study => "Study",
+            FocusPurpose::Mindfullness => "Mindfullness",
+        }
+    }
 }
