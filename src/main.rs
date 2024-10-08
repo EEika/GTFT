@@ -101,7 +101,10 @@ fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<Focu
             let progress = Gauge::default()
                 .block(
                     Block::new()
-                        .title(Title::from("Progress").alignment(Alignment::Center))
+                        .title(
+                            Title::from("(Ain't Nobody) Got Time For That")
+                                .alignment(Alignment::Center),
+                        )
                         .borders(Borders::ALL),
                 )
                 .gauge_style(Style::default().fg(Color::Blue))
