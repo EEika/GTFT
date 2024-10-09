@@ -35,6 +35,7 @@ impl FocusPeriode {
 
         self.start_time.elapsed().as_secs() >= self.interval.as_secs()
     }
+
 }
 
 fn main() -> io::Result<()> {
@@ -120,7 +121,9 @@ fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<Focu
                         .gauge_style(Style::default().fg(Color::Blue))
                         .label(
                             format!(
-                                "OVERTIME! {}:{:0>2}",
+                                "OVERTIME! {}:{:0>2} + {}:{:0>2}",
+                                periode.interval.as_secs() / 60,
+                                periode.interval.as_secs() % 60,
                                 periode.time_over() / 60,
                                 periode.time_over() % 60
                             )
