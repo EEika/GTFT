@@ -27,6 +27,14 @@ impl FocusPeriode {
     fn ratio_remaining(&self) -> f64 {
         self.start_time.elapsed().as_secs() as f64 / self.interval.as_secs() as f64
     }
+
+    fn time_over(&self) -> u64 {
+        self.start_time.elapsed().as_secs() - self.interval.as_secs()
+    }
+    fn periode_finished(&self) -> bool {
+
+        self.start_time.elapsed().as_secs() >= self.interval.as_secs()
+    }
 }
 
 fn main() -> io::Result<()> {
@@ -98,36 +106,71 @@ fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<Focu
                 Constraint::Percentage(80),
                 Constraint::Percentage(80),
             );
-            let progress = Gauge::default()
-                .block(
-                    Block::new()
-                        .title(
-                            Title::from("(Ain't Nobody) Got Time For That")
-                                .alignment(Alignment::Center),
+            let progress = match periode.periode_finished(){
+                true => {
+                    Gauge::default()
+                        .block(
+                            Block::new()
+                                .title(
+                                    Title::from("(Ain't Nobody) Got Time For That")
+                                        .alignment(Alignment::Center),
+                                )
+                                .borders(Borders::ALL),
                         )
-                        .borders(Borders::ALL),
-                )
-                .gauge_style(Style::default().fg(Color::Blue))
-                .label(format!(
-                    "Time remaining: {}:{:0>2}",
-                    periode.time_remaining() / 60,
-                    periode.time_remaining() % 60
-                ))
-                .ratio(periode.ratio_remaining());
-            //.white()
-            //.on_dark_gray();
+                        .gauge_style(Style::default().fg(Color::Blue))
+                        .label(
+                            format!(
+                                "OVERTIME! {}:{:0>2}",
+                                periode.time_over() / 60,
+                                periode.time_over() % 60
+                            )
+                        )
+                        .ratio(1.0) //.white()
+                    //.on_dark_gray();
+
+                },
+
+                false =>   { 
+
+                    Gauge::default()
+                        .block(
+                            Block::new()
+                                .title(
+                                    Title::from("(Ain't Nobody) Got Time For That")
+                                        .alignment(Alignment::Center),
+                                )
+                                .borders(Borders::ALL),
+                        )
+                        .gauge_style(Style::default().fg(Color::Blue))
+                        .label(
+                            format!(
+                                "Time remaining: {}:{:0>2}",
+                                periode.time_remaining() / 60,
+                                periode.time_remaining() % 60
+                            )
+                        )
+                        .ratio(periode.ratio_remaining())
+                    //.white()
+                    //.on_dark_gray();
+                },
+            };
             frame.render_widget(progress, area);
+
         })?;
-        if periode.time_remaining() == 0 {
-            return Ok(FocusStatus::Finished);
-        }
+        // if periode.time_remaining() == 0 {
+        //     return Ok(FocusStatus::Finished);
+        // }
         if event::poll(Duration::from_millis(250))? {
             if let event::Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press
-                    && key.code == KeyCode::Char('c')
-                    && key.modifiers == KeyModifiers::CONTROL
+                && key.code == KeyCode::Char('c')
+                && key.modifiers == KeyModifiers::CONTROL
                 {
-                    return Ok(FocusStatus::Canceled);
+                    // return Ok(FocusStatus::Finished)
+                    match periode.periode_finished() {
+                        true => return Ok(FocusStatus::Finished),
+                        false => return Ok(FocusStatus::Canceled),
+                    }
                 }
             }
         }
