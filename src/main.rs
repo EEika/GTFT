@@ -13,10 +13,36 @@ use std::io;
 use std::time::{Duration, Instant};
 
 #[derive(Debug)]
+enum FocusPurpose {
+    Work,
+    Study,
+    Mindfullness,
+}
+
+#[derive(Debug)]
+enum FocusStatus {
+    InProgress,
+    Finished,
+    Overtime,
+    Canceled,
+}
+
+impl FocusPurpose {
+    fn display(&self) -> &str {
+        match self {
+            FocusPurpose::Work => "Work",
+            FocusPurpose::Study => "Study",
+            FocusPurpose::Mindfullness => "Mindfullness",
+        }
+    }
+}
+
+#[derive(Debug)]
 struct FocusPeriode {
     interval: Duration,
     purpose: FocusPurpose,
     start_time: Instant,
+    status : FocusStatus
 }
 
 impl FocusPeriode {
@@ -34,6 +60,9 @@ impl FocusPeriode {
     fn periode_finished(&self) -> bool {
 
         self.start_time.elapsed().as_secs() >= self.interval.as_secs()
+    }
+    fn update_status(&mut self, new_status : FocusStatus){
+        self.status = new_status;
     }
 
 }
@@ -69,37 +98,30 @@ fn main() -> io::Result<()> {
         }
     }
 
-    let focus_periode = FocusPeriode {
+    let mut focus_periode = FocusPeriode {
         interval: Duration::new((focus_time_min * 60) + focus_time_sec, 0),
         purpose: focus_purpose,
         start_time: Instant::now(),
+        status : FocusStatus::InProgress,
     };
 
     let mut terminal = ratatui::init();
     terminal.clear()?;
 
-    let app_result = run(terminal, &focus_periode);
+    let app_result = run(terminal, &mut focus_periode);
     ratatui::restore();
 
     match app_result? {
         FocusStatus::Finished => {
-            Notification::new()
-                .summary("GTFT")
-                .body(&format!(
-                    "{} session finished. Well done!",
-                    focus_periode.purpose.display()
-                ))
-                //.timeout(Timeout::Milliseconds(6000)) //milliseconds
-                .show()
-                .unwrap();
             println!("Done!\x07");
         }
         FocusStatus::Canceled => (),
+        _ => (),
     };
     Ok(())
 }
 
-fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<FocusStatus> {
+fn run(mut terminal: DefaultTerminal, periode: &mut FocusPeriode) -> io::Result<FocusStatus> {
     loop {
         terminal.draw(|frame| {
             let area = center(
@@ -107,18 +129,52 @@ fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<Focu
                 Constraint::Percentage(80),
                 Constraint::Percentage(80),
             );
-            let progress = match periode.periode_finished(){
-                true => {
-                    Gauge::default()
-                        .block(
-                            Block::new()
-                                .title(
-                                    Title::from("(Ain't Nobody) Got Time For That")
-                                        .alignment(Alignment::Center),
-                                )
-                                .borders(Borders::ALL),
+            let main_block_base =
+                Gauge::default()
+                .block(
+                    Block::new()
+                    .title(
+                        Title::from("(Ain't Nobody) Got Time For That")
+                        .alignment(Alignment::Center),
+                    )
+                    .borders(Borders::ALL),
+                )
+                .gauge_style(Style::default().fg(Color::Blue));
+            let progress = match periode.status {
+                FocusStatus::InProgress => {
+                    if periode.periode_finished(){
+                        periode.update_status(FocusStatus::Finished);
+                    }
+                    main_block_base.clone()
+                        .label(
+                            format!(
+                                "Time remaining: {}:{:0>2}",
+                                periode.time_remaining() / 60,
+                                periode.time_remaining() % 60
+                            )
                         )
-                        .gauge_style(Style::default().fg(Color::Blue))
+                        .ratio(periode.ratio_remaining())
+                },
+                FocusStatus::Finished => {
+                    if periode.periode_finished(){
+                        periode.update_status(FocusStatus::Overtime);
+                    }
+                    Notification::new()
+                        .summary("GTFT")
+                        .body(&format!(
+                                "{} session finished. Well done!",
+                                periode.purpose.display()
+                        ))
+                        .timeout(Timeout::Never)
+                        .show()
+                        .unwrap();
+                    main_block_base.clone()
+                        .label( "DONE!")
+                        .ratio(1.0) //.white()
+                },
+                FocusStatus::Overtime => {
+
+                    main_block_base.clone()
                         .label(
                             format!(
                                 "OVERTIME! {}:{:0>2} + {}:{:0>2}",
@@ -128,34 +184,10 @@ fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<Focu
                                 periode.time_over() % 60
                             )
                         )
-                        .ratio(1.0) //.white()
-                    //.on_dark_gray();
-
+                        .ratio(1.0)
                 },
+                FocusStatus::Canceled => {main_block_base.clone()},
 
-                false =>   { 
-
-                    Gauge::default()
-                        .block(
-                            Block::new()
-                                .title(
-                                    Title::from("(Ain't Nobody) Got Time For That")
-                                        .alignment(Alignment::Center),
-                                )
-                                .borders(Borders::ALL),
-                        )
-                        .gauge_style(Style::default().fg(Color::Blue))
-                        .label(
-                            format!(
-                                "Time remaining: {}:{:0>2}",
-                                periode.time_remaining() / 60,
-                                periode.time_remaining() % 60
-                            )
-                        )
-                        .ratio(periode.ratio_remaining())
-                    //.white()
-                    //.on_dark_gray();
-                },
             };
             frame.render_widget(progress, area);
 
@@ -166,37 +198,16 @@ fn run(mut terminal: DefaultTerminal, periode: &FocusPeriode) -> io::Result<Focu
         if event::poll(Duration::from_millis(250))? {
             if let event::Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press
-                && key.code == KeyCode::Char('c')
-                && key.modifiers == KeyModifiers::CONTROL
+                    && key.code == KeyCode::Char('c')
+                        && key.modifiers == KeyModifiers::CONTROL
                 {
                     // return Ok(FocusStatus::Finished)
-                    match periode.periode_finished() {
-                        true => return Ok(FocusStatus::Finished),
-                        false => return Ok(FocusStatus::Canceled),
+                    match periode.status {
+                        FocusStatus::Finished | FocusStatus::Overtime => return Ok(FocusStatus::Finished),
+                        FocusStatus::InProgress | FocusStatus::Canceled => return Ok(FocusStatus::Canceled),
                     }
                 }
             }
-        }
-    }
-}
-#[derive(Debug)]
-enum FocusPurpose {
-    Work,
-    Study,
-    Mindfullness,
-}
-
-enum FocusStatus {
-    Finished,
-    Canceled,
-}
-
-impl FocusPurpose {
-    fn display(&self) -> &str {
-        match self {
-            FocusPurpose::Work => "Work",
-            FocusPurpose::Study => "Study",
-            FocusPurpose::Mindfullness => "Mindfullness",
         }
     }
 }
